@@ -1,0 +1,14 @@
+# 執行紀錄與暫存
+run.log
+*.log
+
+# 密鑰 / 環境
+.env
+.env.*
+*.key
+auth.json
+
+# 依賴 / 系統
+node_modules/
+.DS_Store
+Thumbs.db
