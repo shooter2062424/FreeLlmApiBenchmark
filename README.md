@@ -104,13 +104,14 @@ Highlights:
 | `docs/index.html` | Published static report (GitHub Pages) |
 | `report.html` | Local duplicate of the report — gitignored |
 | `nvmodels.json` | Snapshot of `/v1/models` from the last run |
-| `pi-nvidia-listmodels.txt` | Declared context / max-out reference table |
+| `pi-nvidia-listmodels.txt` | Declared context / max-out reference (from pi model DB) |
+| `context-db.json` | Web-sourced context windows with source + confidence (curated, maintainable) |
 
 ---
 
 ## Limitations
 
-- **Context window & max output** are not returned by NVIDIA's OpenAI-compatible API, and probing (oversized `max_tokens`) is silently truncated — so those columns are only populated for models present in the pi DB. NVIDIA does not distinguish input vs output context.
+- **Context window & max output** are not returned by NVIDIA's OpenAI-compatible API, and probing (oversized `max_tokens`) is silently truncated. This column is therefore backfilled from `context-db.json` — a curated table sourced from each model's card (NVIDIA / HuggingFace config / official docs), with `source` + `confidence` per entry. Web-sourced values are marked `ᵂ` in the report (hover for the source). Only a few pure image/OCR models with no token context remain blank. NVIDIA does not distinguish input vs output context.
 - `cache` blank ≠ unsupported; it means the model never reported `cached_tokens`, so it can't be measured.
 - The header timeout does not bound streaming, so a few giant models report very long but *real* TTFTs.
 - Cold-start numbers depend on NVCF warm/cold state at run time and will vary.
