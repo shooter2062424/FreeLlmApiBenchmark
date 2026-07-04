@@ -2,6 +2,10 @@
 run.log
 *.log
 
+# 帳號實測輸出(會洩漏此 key 能存取哪些 model)—本地產生,不上傳
+results.json
+report.html
+
 # 密鑰 / 環境
 .env
 .env.*
