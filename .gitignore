@@ -2,8 +2,7 @@
 run.log
 *.log
 
-# 帳號實測輸出(會洩漏此 key 能存取哪些 model)—本地產生,不上傳
-results.json
+# 本地重複產生的報告副本(公開版在 docs/index.html)
 report.html
 
 # 密鑰 / 環境

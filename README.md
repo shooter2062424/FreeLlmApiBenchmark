@@ -8,6 +8,8 @@ each one (chat / embedding / rerank / …), measures real performance, and rende
 Nothing is hard-coded: on every run it calls `/v1/models`, so new models appear
 automatically and retired ones are flagged.
 
+**🌐 Live report:** https://shooter2062424.github.io/FreeLlmApiBenchmark/ (each report is annotated with its scan date)
+
 ---
 
 ## What it measures
@@ -98,8 +100,9 @@ Highlights:
 |------|---------|
 | `benchmark.js` | Benchmark engine — discovery, classification, measurement |
 | `report.js` | Standalone HTML report generator (also called by `benchmark.js`) |
-| `results.json` | Raw results — generated locally, **gitignored** (reveals which models your key can access) |
-| `report.html` | Generated interactive report — generated locally, **gitignored** |
+| `results.json` | Raw results from the last scan |
+| `docs/index.html` | Published static report (GitHub Pages) |
+| `report.html` | Local duplicate of the report — gitignored |
 | `nvmodels.json` | Snapshot of `/v1/models` from the last run |
 | `pi-nvidia-listmodels.txt` | Declared context / max-out reference table |
 
