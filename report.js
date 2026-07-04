@@ -25,6 +25,10 @@ function generateReport(data) {
   const meta = data.meta || {};
   const rows = (data.results || []).slice();
 
+  // 網路查詢補齊的 context window DB(NVIDIA API 不提供)
+  let webCtx = {};
+  try { webCtx = JSON.parse(fs.readFileSync(path.join(__dirname, "context-db.json"), "utf8")); } catch {}
+
   // 統計
   const byType = {};
   rows.forEach((r) => { byType[r.type || "?"] = (byType[r.type || "?"] || 0) + 1; });
@@ -36,14 +40,17 @@ function generateReport(data) {
   // 每列資料(給前端 JS 用)
   const jsonRows = rows.map((r) => {
     const d = r.declared || {};
+    const w = webCtx[r.id];
     return {
       id: r.id,
       owned_by: r.owned_by || "",
       type: r.type || "?",
       status: r.status || "",
-      context: d.context ?? null,
-      maxOut: d.maxOutput ?? r.probedMaxOutput ?? null,
-      maxOutSrc: d.maxOutput != null ? "declared" : (r.probedMaxOutput != null ? "probed" : ""),
+      context: d.context ?? (w && w.context != null ? w.context : null),
+      contextSrc: d.context != null ? "pi" : (w && w.context != null ? "web" : ""),
+      contextInfo: d.context != null ? "pi 內建 DB(宣告值)" : (w && w.context != null ? (w.source || "web") + (w.confidence ? " · " + w.confidence : "") : ""),
+      maxOut: d.maxOutput ?? (w && w.maxOutput != null ? w.maxOutput : null) ?? r.probedMaxOutput ?? null,
+      maxOutSrc: d.maxOutput != null ? "declared" : (w && w.maxOutput != null ? "web" : (r.probedMaxOutput != null ? "probed" : "")),
       reasoning: r.type === "chat" && r.status === "ok" ? !!r.reasoning : (d.reasoning ?? null),
       reasoningMeasured: r.type === "chat" && r.status === "ok",
       cache: r.cache == null ? null : !!r.cache,
@@ -132,6 +139,8 @@ function generateReport(data) {
   .glossgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px 24px;padding:4px 18px 18px}
   .glossgrid > div{line-height:1.6} .glossgrid b{color:var(--accent);display:inline-block;min-width:88px}
   .glossgrid span{color:var(--muted)} code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:11px}
+  .about{margin-top:28px;padding:18px 20px;background:var(--panel);border:1px solid var(--border);border-radius:10px;font-size:13px;line-height:1.75;color:var(--muted)}
+  .about h2{font-size:15px;margin:0 0 8px;color:var(--text)} .about p{margin:0 0 8px} .about p:last-child{margin:0} .about a{color:var(--accent)}
 </style>
 </head>
 <body>
@@ -153,7 +162,7 @@ function generateReport(data) {
     <summary>📖 名詞說明(點開)</summary>
     <div class="glossgrid">
       <div><b>Type</b><span>該 model 實測分類:<code>chat</code> 文字生成、<code>embedding</code> 向量、<code>rerank</code> 重排序、<code>unsupported/reward/ocr</code> 等非對話型。由「哪個 API endpoint 呼叫成功」決定。</span></div>
-      <div><b>Context</b><span>上下文視窗(總 token 上限)。NVIDIA API <b>不回傳</b>此值,僅少數在 pi 內建 DB 的 model 有宣告值,其餘留空。NVIDIA 不區分 input/output context。</span></div>
+      <div><b>Context</b><span>上下文視窗(總 token 上限)。NVIDIA API <b>不回傳</b>,故此欄由 pi 內建 DB(宣告值)+ 逐一<b>網路查詢</b>各 model card 補齊;標 <span class="mutd">ᵂ</span>=網路來源,滑鼠移上去看出處與信心度。NVIDIA 不區分 input/output context。</span></div>
       <div><b>Max out</b><span>單次最多輸出 token 數(宣告值)。同樣多數 model 無法取得。</span></div>
       <div><b>Reasoning</b><span>是否為推理模型:<span class="measured">虛線底</span>=實測(串流是否出現 <code>reasoning_content</code> 或 <code>&lt;think&gt;</code>);否則為宣告值。</span></div>
       <div><b>Cache</b><span>是否支援 prompt 快取:同一長 prompt 連打兩次,第二次 <code>cached_tokens&gt;0</code> 才算 yes。空白=該 model 未回報此欄位,無法判定。</span></div>
@@ -183,8 +192,8 @@ function generateReport(data) {
         <th data-k="id" title="Model ID(呼叫時傳給 API 的名稱)">Model</th>
         <th data-k="owner" title="模型提供者 / owner">Owner</th>
         <th data-k="type" title="實測分類:chat / embedding / rerank / 非對話型。由哪個 endpoint 呼叫成功決定">Type ⓘ</th>
-        <th data-k="context" class="num" title="上下文視窗總 token 上限。NVIDIA API 不回傳,僅內建 DB 的 model 有宣告值,其餘留空">Context ⓘ</th>
-        <th data-k="maxOut" class="num" title="單次最多輸出 token 數(宣告值)">Max out ⓘ</th>
+        <th data-k="context" class="num" title="上下文視窗總 token 上限。NVIDIA API 不回傳;由 pi 內建 DB + 網路查詢 model card 補齊。ᵂ=網路來源,滑鼠移上數字看出處">Context ⓘ</th>
+        <th data-k="maxOut" class="num" title="單次最多輸出 token 數(多數來源未標,故常空白)">Max out ⓘ</th>
         <th data-k="reasoning" title="是否推理模型。虛線底=實測(串流出現 reasoning_content 或 <think>)">Reasoning ⓘ</th>
         <th data-k="cache" title="是否支援 prompt 快取(實測 cached_tokens>0)。空白=未回報,無法判定">Cache ⓘ</th>
         <th data-k="coldMs" class="num" title="第一次呼叫(含 NVCF 冷啟動)的總耗時 ms。不代表穩定速度">Cold start ⓘ</th>
@@ -204,8 +213,15 @@ function generateReport(data) {
     • <b>Token rate</b>:(生成 token − 1) ÷ (最後 token − 第一個 token),<b>排除 TTFT</b>;整包一次吐回(genMs≈0)則標 null。<br>
     • <b>Cold start</b>:第一次呼叫(含 NVCF 冷啟動)的總 wall time,單獨記錄、<b>不</b>計入 TTFT/rate。<br>
     • <b>非生成型</b>:chat 端點成功但 0 token(如 <span class="mono">gliner-pii</span>)→ 只有 cold start,TTFT/rate 本質上無法量測。<br>
-    • <b>Context / Max out</b>:NVIDIA <span class="mono">/v1/models</span> <b>不回傳</b>,連送超大 max_tokens 探測都被靜默截斷;只有 pi 內建 DB 涵蓋的 model 有宣告值,其餘留空。NVIDIA 未區分 input/output context。
+    • <b>Context / Max out</b>:NVIDIA <span class="mono">/v1/models</span> <b>不回傳</b>,連送超大 max_tokens 探測都被靜默截斷;此欄由 pi 內建 DB(宣告值)+ 逐一網路查詢各 model card 補齊(標 ᵂ),仍空白者為本質無 token context 的影像/OCR 模型。NVIDIA 未區分 input/output context。
   </div>
+
+  <footer class="about">
+    <h2>關於 About</h2>
+    <p>本專案是一支<b>動態</b> benchmark 工具:對 <b>NVIDIA NIM</b>(<span class="mono">integrate.api.nvidia.com</span>)以 API key 可存取的<b>所有 model</b>,於掃描日自動探索、分類並實測 TTFT、token rate、reasoning、cache、cold start 等指標,再產生本頁。Context window 因 NVIDIA API 未提供,改以網路查詢各 model card 補齊。</p>
+    <p><b>資料性質:</b>所有數據為<b>掃描當下的快照</b>,會隨 NVIDIA 上下架、帳號開通範圍與伺服器負載而變動;效能數字受免費 tier 速率限制與 NVCF 冷啟動影響,僅供相對參考,非官方 SLA。</p>
+    <p><b>原始碼 / 重跑方式 / 完整方法論:</b><a href="https://github.com/shooter2062424/FreeLlmApiBenchmark">github.com/shooter2062424/FreeLlmApiBenchmark</a>　·　授權 MIT　·　工具與報告由 benchmark.js / report.js 產生。</p>
+  </footer>
 </div>
 
 <script>
@@ -228,6 +244,12 @@ function statusBadge(r){
   if(r.status==='unavailable') return '<span class="badge b-warn">未開通</span>';
   if(r.status==='unsupported') return '<span class="badge b-warn">不支援</span>';
   return '<span class="badge b-err">'+(r.status||'error')+'</span>';
+}
+function ctxCell(r){
+  if(r.context==null) return '<td class="num"></td>';
+  const title = r.contextInfo? ' title="來源:'+esc(r.contextInfo)+'"' : '';
+  const mark = r.contextSrc==='web' ? '<span class="mutd"> ᵂ</span>' : '';
+  return '<td class="num"'+title+'>'+fmtCtx(r.context)+mark+'</td>';
 }
 function ttftCell(r){
   if(r.ttftMs!=null) return fmtNum(r.ttftMs);
@@ -262,8 +284,8 @@ function render(){
       + cell('<span class="mono">'+esc(r.id)+'</span>')
       + cell('<span class="mono" style="color:var(--muted)">'+esc(r.owned_by||'')+'</span>')
       + cell('<span class="badge b-type">'+esc(r.type)+'</span>')
-      + cell(r.context!=null? fmtCtx(r.context): '', 'num')
-      + cell(r.maxOut!=null? (fmtCtx(r.maxOut)+(r.maxOutSrc==='probed'?' <span style="color:var(--muted);font-size:10px">(p)</span>':'')): '', 'num')
+      + ctxCell(r)
+      + cell(r.maxOut!=null? (fmtCtx(r.maxOut)+(r.maxOutSrc==='probed'?' <span class="mutd">(p)</span>':'')): '', 'num')
       + cell(ynMeasured(r.reasoning, r.reasoningMeasured))
       + cell(ynMeasured(r.cache, r.cache!=null))
       + cell(r.coldMs!=null? fmtNum(r.coldMs): '', 'num')
